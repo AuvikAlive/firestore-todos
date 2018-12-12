@@ -7,13 +7,21 @@ const cors = require("cors")
 admin.initializeApp({
   credential: admin.credential.applicationDefault(),
 })
+
 const db = admin.firestore()
+db.settings({ timestampsInSnapshots: true })
+
 const router = Router()
 
 router.get("/", async (req, res, next) => {
   try {
-    const todoSnapshot = await db.collection("todos").get()
+    const todoSnapshot = await db
+      .collection("todos")
+      .orderBy("timestamp", "desc")
+      .get()
+
     const todos = []
+
     todoSnapshot.forEach(doc => {
       todos.push({
         id: doc.id,
@@ -28,10 +36,16 @@ router.get("/", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const text = req.body.text
-    if (!text) throw new Error("Text is blank")
-    const data = { text }
+    const todo = req.body.todo
+
+    if (!todo) throw new Error("todo is blank")
+
+    const data = {
+      todo,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    }
     const ref = await db.collection("todos").add(data)
+
     return res.json({
       id: ref.id,
       data,
@@ -42,8 +56,9 @@ router.post("/", async (req, res, next) => {
 })
 
 const app = express()
+
 app.use(cors({ origin: true }))
 app.use(express.json())
-app.use("/api", router)
+app.use("/", router)
 
 exports.api = functions.https.onRequest(app)
